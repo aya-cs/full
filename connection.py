@@ -1,81 +1,88 @@
+connection.py - Connexion PostgreSQL (Streamlit Cloud compatible)
+Utilise st.secrets["postgres"] pour les identifiants.
 """
-connection.py - Connexion PostgreSQL CORRIGÉE
-Version finale testée et fonctionnelle
-"""
+
+import streamlit as st
 import psycopg2
 import psycopg2.extras
 import pandas as pd
-import streamlit as st
+
 
 class SimpleConnection:
-    """Classe pour gérer la connexion à PostgreSQL"""
-    
-    mport streamlit as st
-import psycopg2
+    """Gestion simple de connexion PostgreSQL."""
 
-conn = psycopg2.connect(
-    host=st.secrets["postgres"]["host"],
-    dbname=st.secrets["postgres"]["dbname"],
-    user=st.secrets["postgres"]["user"],
-    password=st.secrets["postgres"]["password"],
-    port=st.secrets["postgres"]["port"]
-)
+    @staticmethod
+    def get_connection():
+        """Crée et retourne une nouvelle connexion PostgreSQL."""
+        try:
+            cfg = st.secrets["postgres"]
+            return psycopg2.connect(
+                host=cfg["host"],
+                dbname=cfg["dbname"],
+                user=cfg["user"],
+                password=cfg["password"],
+                port=int(cfg.get("port", 5432)),
+                sslmode=cfg.get("sslmode", "require"),  # utile pour Neon/Supabase
+            )
+        except Exception as e:
+            # Affiche l'erreur dans l'app Streamlit
+            st.error(f"⚠️ Connexion DB impossible : {e}")
+            return None
 
 
 def execute_query(query: str, params=None, fetch=True):
-    """Exécute une requête SQL et retourne les résultats"""
+    """Exécute une requête SQL et retourne les résultats (liste de dict) ou le nombre de lignes affectées."""
     conn = None
-    cursor = None
+    cur = None
+
     try:
         conn = SimpleConnection.get_connection()
-        if not conn:
+        if conn is None:
             return [] if fetch else 0
-        
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cursor.execute(query, params or ())
-        
+
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(query, params or ())
+
         if fetch:
-            results = cursor.fetchall()
+            results = cur.fetchall()
             conn.commit()
             return results
         else:
-            row_count = cursor.rowcount
+            row_count = cur.rowcount
             conn.commit()
             return row_count
-            
+
     except psycopg2.Error as e:
         st.error(f"⚠️ Erreur SQL : {e}")
         if conn:
             conn.rollback()
         return [] if fetch else 0
+
     except Exception as e:
         st.error(f"⚠️ Erreur lors de l'exécution : {e}")
         if conn:
             conn.rollback()
         return [] if fetch else 0
+
     finally:
-        if cursor:
-            cursor.close()
+        if cur:
+            cur.close()
         if conn:
             conn.close()
 
-def load_dataframe(query: str, params=None):
-    """Retourne un DataFrame pandas à partir d'une requête"""
-    results = execute_query(query, params, fetch=True)
-    if results:
-        return pd.DataFrame(results)
-    return pd.DataFrame()
 
-# Test de connexion au lancement
-if __name__ == "__main__":
-    print("🔍 Test de connexion à la base de données...")
-    conn = SimpleConnection.get_connection()
-    if conn:
-        print("✅ Connexion réussie à exam_platform !")
-        test_results = execute_query("SELECT COUNT(*) AS nb FROM etudiants")
-        if test_results:
-            print(f"   → Nombre d'étudiants : {test_results[0]['nb']}")
-        conn.close()
+def load_dataframe(query: str, params=None) -> pd.DataFrame:
+    """Retourne un DataFrame pandas à partir d'une requête SQL."""
+    results = execute_query(query, params=params, fetch=True)
+    return pd.DataFrame(results) if results else pd.DataFrame()
+
+
+# Test local seulement (pas nécessaire sur Streamlit Cloud)
+if _name_ == "_main_":
+    print("🔍 Test de connexion DB...")
+    c = SimpleConnection.get_connection()
+    if c:
+        print("✅ Connexion OK")
+        c.close()
     else:
-
-        print("❌ La connexion a échoué.")
+        print("❌ Connexion échouée")
