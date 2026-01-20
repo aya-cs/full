@@ -10,32 +10,17 @@ import streamlit as st
 class SimpleConnection:
     """Classe pour gérer la connexion à PostgreSQL"""
     
-    @staticmethod
-    def get_connection():
-        """Retourne une connexion à la base exam_platform"""
-        try:
-            conn = psycopg2.connect(
-                dbname="exam_platform",
-                user="postgres",
-                password="gr123",  # ✅ TON MOT DE PASSE
-                host="localhost",
-                port="5432",
-                connect_timeout=10
-            )
-            return conn
-        except psycopg2.OperationalError as e:
-            st.error(f"⚠️ Erreur de connexion PostgreSQL : {e}")
-            st.error("""
-            💡 Vérifiez :
-            • PostgreSQL est-il lancé ?
-            • La base 'exam_platform' existe-t-elle ?
-            • Le mot de passe est-il 'gr123' ?
-            • Le port 5432 est-il disponible ?
-            """)
-            return None
-        except Exception as e:
-            st.error(f"❌ Erreur inattendue : {e}")
-            return None
+    mport streamlit as st
+import psycopg2
+
+conn = psycopg2.connect(
+    host=st.secrets["postgres"]["host"],
+    dbname=st.secrets["postgres"]["dbname"],
+    user=st.secrets["postgres"]["user"],
+    password=st.secrets["postgres"]["password"],
+    port=st.secrets["postgres"]["port"]
+)
+
 
 def execute_query(query: str, params=None, fetch=True):
     """Exécute une requête SQL et retourne les résultats"""
@@ -92,4 +77,5 @@ if __name__ == "__main__":
             print(f"   → Nombre d'étudiants : {test_results[0]['nb']}")
         conn.close()
     else:
+
         print("❌ La connexion a échoué.")
